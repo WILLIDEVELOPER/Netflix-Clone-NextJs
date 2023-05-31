@@ -3,6 +3,7 @@ import { without } from "lodash";
 
 import prismadb from "@/lib/prismadb";
 import serverAuth from "@/lib/serverAuth";
+import { getSession } from "next-auth/react";
 
 export default async function handler(
   req: NextApiRequest,
@@ -10,10 +11,20 @@ export default async function handler(
 ) {
   try {
     if (req.method === "POST") {
-      const { currentUser } = await serverAuth(req);
-
       const { movieId } = req.body;
+      const session = await getSession({
+        req,
+      });
 
+      const currentUser = await prismadb.user.findUnique({
+        where: {
+          email: session?.user?.email || "",
+        },
+      });
+
+      if (!currentUser) {
+        throw new Error("Not signed in");
+      }
       const existingMovie = await prismadb.movie.findUnique({
         where: {
           id: movieId,
@@ -26,7 +37,7 @@ export default async function handler(
 
       const user = await prismadb.user.update({
         where: {
-          email: currentUser.email || "",
+          email: currentUser?.email || "",
         },
         data: {
           favoriteIds: {
